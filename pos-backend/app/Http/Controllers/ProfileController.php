@@ -2,62 +2,82 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ProfileUpdateRequest;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Http\RedirectResponse;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redirect;
-use Inertia\Inertia;
-use Inertia\Response;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
-class ProfileController extends Controller
+class UserController extends Controller
 {
     /**
-     * Display the user's profile form.
+     * Display a listing of users (Admin only)
      */
-    public function edit(Request $request): Response
+    public function index()
     {
-        return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
-            'status' => session('status'),
-        ]);
+        $users = User::select('id', 'name', 'email', 'role')->get();
+        return response()->json($users);
     }
 
     /**
-     * Update the user's profile information.
+     * Store a newly created user (Admin only)
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function store(Request $request)
     {
-        $request->user()->fill($request->validated());
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:8|confirmed',
+            'role' => ['required', Rule::in(['admin', 'manager', 'cashier'])],
+        ]);
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
         }
 
-        $request->user()->save();
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => $request->role,
+        ]);
 
-        return Redirect::route('profile.edit');
+        return response()->json(['message' => 'User created successfully', 'user' => $user], 201);
     }
 
     /**
-     * Delete the user's account.
+     * Update an existing user (Admin only)
      */
-    public function destroy(Request $request): RedirectResponse
+    public function update(Request $request, User $user)
     {
-        $request->validate([
-            'password' => ['required', 'current_password'],
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|string|max:255',
+            'email' => ['sometimes', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'password' => 'nullable|string|min:8|confirmed',
+            'role' => ['sometimes', Rule::in(['admin', 'manager', 'cashier'])],
         ]);
 
-        $user = $request->user();
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
+        }
 
-        Auth::logout();
+        $user->fill($request->only(['name', 'email', 'role']));
 
+        if ($request->filled('password')) {
+            $user->password = Hash::make($request->password);
+        }
+
+        $user->save();
+
+        return response()->json(['message' => 'User updated successfully', 'user' => $user]);
+    }
+
+    /**
+     * Delete a user (Admin only)
+     */
+    public function destroy(User $user)
+    {
         $user->delete();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return Redirect::to('/');
+        return response()->json(['message' => 'User deleted successfully']);
     }
 }
