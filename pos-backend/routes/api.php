@@ -6,8 +6,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('products', ProductController::class);
-    Route::get('products/low-stock', [ProductController::class, 'lowStock']);
-    Route::get('products/search', [ProductController::class, 'search']);
+    Route::get('/products/low-stock', [ProductController::class, 'lowStock']);
+    Route::get('/products/search', [ProductController::class, 'search']);
 
     // 🔓 Public routes
     Route::post('/register', [AuthController::class, 'register']);
@@ -19,7 +19,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::middleware(['auth:sanctum', 'role:admin,manager'])->group(function () {
-        Route::apiResource('products', ProductController::class);
+        Route::apiResource('/products', ProductController::class);
     });
 
     Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
